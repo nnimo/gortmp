@@ -5,6 +5,7 @@ package gortmp
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/zhangpeihao/goamf"
 	"github.com/zhangpeihao/log"
 )
@@ -87,6 +88,7 @@ func (stream *inboundStream) Received(message *Message) bool {
 	if message.Type == VIDEO_TYPE || message.Type == AUDIO_TYPE {
 		return false
 	}
+
 	var err error
 	if message.Type == COMMAND_AMF0 || message.Type == COMMAND_AMF3 {
 		cmd := &Command{}
@@ -123,6 +125,8 @@ func (stream *inboundStream) Received(message *Message) bool {
 			}
 			cmd.Objects = append(cmd.Objects, object)
 		}
+
+		logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE, "Received command: %+v\n", cmd)
 
 		switch cmd.Name {
 		case "play":
@@ -193,7 +197,7 @@ func (stream *inboundStream) onPlay(cmd *Command) bool {
 		stream.streamName = streamName
 	}
 	// Response
-	stream.conn.conn.SetChunkSize(4096)
+	stream.conn.conn.SetChunkSize(512)
 	stream.conn.conn.SendUserControlMessage(EVENT_STREAM_BEGIN)
 	stream.streamReset()
 	stream.streamStart()
@@ -203,8 +207,28 @@ func (stream *inboundStream) onPlay(cmd *Command) bool {
 }
 
 func (stream *inboundStream) onPublish(cmd *Command) bool {
+	// Get stream name
+	if cmd.Objects == nil || len(cmd.Objects) < 2 || cmd.Objects[1] == nil {
+		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
+			"inboundStream::onPlay: command error 1! %+v\n", cmd)
+		return true
+	}
+
+	if streamName, ok := cmd.Objects[1].(string); !ok {
+		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
+			"inboundStream::onPlay: command error 2! %+v\n", cmd)
+		return true
+	} else {
+		stream.streamName = streamName
+	}
+
+	//stream.conn.conn.SetChunkSize(512)
+	//stream.conn.conn.SendUserControlMessage(EVENT_STREAM_BEGIN)
+	stream.streamPublish()
+
 	return true
 }
+
 func (stream *inboundStream) onRecevieAudio(cmd *Command) bool {
 	return true
 }
@@ -268,6 +292,34 @@ func (stream *inboundStream) streamStart() {
 		Buf:           buf,
 	}
 	message.Dump("streamStart")
+	stream.conn.conn.Send(message)
+}
+
+func (stream *inboundStream) streamPublish() {
+	cmd := &Command{
+		IsFlex:        false,
+		Name:          "onStatus",
+		TransactionID: 0,
+		Objects:       make([]interface{}, 2),
+	}
+	cmd.Objects[0] = nil
+	cmd.Objects[1] = amf.Object{
+		"level":       "status",
+		"code":        NETSTREAM_PUBLISH_START,
+		"description": fmt.Sprintf("Started publishing %s", stream.streamName),
+		"details":     stream.streamName,
+	}
+	buf := new(bytes.Buffer)
+	err := cmd.Write(buf)
+	CheckError(err, "inboundStream::streamPublish() Create command")
+
+	message := &Message{
+		ChunkStreamID: CS_ID_USER_CONTROL,
+		Type:          COMMAND_AMF0,
+		Size:          uint32(buf.Len()),
+		Buf:           buf,
+	}
+	message.Dump("streamPublish")
 	stream.conn.conn.Send(message)
 }
 

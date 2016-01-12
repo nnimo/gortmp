@@ -3,9 +3,10 @@ package gortmp
 
 import (
 	"bufio"
-	"github.com/zhangpeihao/log"
 	"net"
 	"time"
+
+	"github.com/zhangpeihao/log"
 )
 
 type ServerHandler interface {
@@ -81,11 +82,28 @@ func (server *Server) Handshake(c net.Conn) {
 				"Server::Handshake panic error:", err)
 		}
 	}()
+
+	tcp_conn, ok := c.(*net.TCPConn)
+	if ok {
+		if err := tcp_conn.SetNoDelay(false); err != nil {
+			logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG,
+				"set TCP_NODELAY failed. err is", err)
+		} else {
+			logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG,
+				"set TCP_NODELAY false")
+		}
+	} else {
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG,
+			"type cast failed", c)
+	}
+
 	logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG,
 		"Handshake begin")
 	br := bufio.NewReader(c)
 	bw := bufio.NewWriter(c)
-	timeout := time.Duration(10) * time.Second
+	//timeout := time.Duration(10) * time.Second
+	timeout := time.Duration(0)
+
 	if err := SHandshake(c, br, bw, timeout); err != nil {
 		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
 			"SHandshake error:", err)

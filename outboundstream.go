@@ -4,6 +4,7 @@ package gortmp
 
 import (
 	"errors"
+
 	"github.com/zhangpeihao/goamf"
 	"github.com/zhangpeihao/log"
 )
@@ -29,6 +30,7 @@ type outboundStream struct {
 type OutboundStream interface {
 	OutboundPublishStream
 	OutboundPlayStream
+	Conn() OutboundConn
 	// ID
 	ID() uint32
 	// Pause
@@ -67,6 +69,10 @@ type OutboundPlayStream interface {
 	Play(streamName string, start, duration *uint32, reset *bool) (err error)
 	// Seeks the kerframe closedst to the specified location.
 	Seek(offset uint32)
+}
+
+func (stream *outboundStream) Conn() OutboundConn {
+	return stream.conn
 }
 
 // ID

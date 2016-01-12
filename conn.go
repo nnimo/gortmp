@@ -6,14 +6,17 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	//	"encoding/hex"
 	"errors"
-	"github.com/zhangpeihao/goamf"
-	"github.com/zhangpeihao/log"
+	//	"fmt"
 	"io"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/zhangpeihao/goamf"
+	"github.com/zhangpeihao/log"
 )
 
 // Conn
@@ -355,7 +358,11 @@ func (conn *conn) readLoop() {
 				IsInbound:         true,
 				AbsoluteTimestamp: absoluteTimestamp,
 			}
+
+			logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "New message, size:", message.Size)
+
 		}
+
 		chunkstream.lastInAbsoluteTimestamp = absoluteTimestamp
 		// Read data
 		remain = message.Remain()
@@ -388,8 +395,8 @@ func (conn *conn) readLoop() {
 			chunkstream.receivedMessage = nil
 		} else {
 			// Unfinish
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
-				"Unfinish message(remain: %d, chunksize: %d)\n", remain, conn.inChunkSize)
+			//			logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
+			//				"Unfinish message(remain: %d, chunksize: %d)\n", remain, conn.inChunkSize)
 
 			remain = conn.inChunkSize
 			for {
@@ -529,6 +536,8 @@ func (conn *conn) received(message *Message) {
 	var timestamp uint32
 	var timestampExt byte
 	if message.Type == AGGREGATE_MESSAGE_TYPE {
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "message.Type == AGGREGATE_MESSAGE_TYPE")
+
 		// Byte stream order
 		// Sub message type 1 byte
 		// Data size 3 bytes, big endian
@@ -619,6 +628,8 @@ func (conn *conn) received(message *Message) {
 	} else {
 		switch message.ChunkStreamID {
 		case CS_ID_PROTOCOL_CONTROL:
+			logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "CS_ID_PROTOCOL_CONTROL")
+
 			switch message.Type {
 			case SET_CHUNK_SIZE:
 				conn.invokeSetChunkSize(message)
@@ -637,6 +648,8 @@ func (conn *conn) received(message *Message) {
 					"Unkown message type %d in Protocol control chunk stream!\n", message.Type)
 			}
 		case CS_ID_COMMAND:
+			logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "CS_ID_COMMAND", message.StreamID)
+
 			if message.StreamID == 0 {
 				cmd := &Command{}
 				var err error
@@ -684,6 +697,7 @@ func (conn *conn) received(message *Message) {
 				conn.handler.OnReceived(conn, message)
 			}
 		default:
+			logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "DEFAULT", message.StreamID)
 			conn.handler.OnReceived(conn, message)
 		}
 	}

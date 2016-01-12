@@ -5,6 +5,7 @@ package gortmp
 import (
 	"encoding/binary"
 	"errors"
+
 	"github.com/zhangpeihao/log"
 )
 
@@ -60,8 +61,12 @@ func ReadBaseHeader(rbuf Reader) (n int, fmt uint8, csi uint32, err error) {
 		return
 	}
 	n = 1
+
 	fmt = uint8(b >> 6)
 	b = b & 0x3f
+
+	//frmt.Println("b0", b&0x3f, " fmt", fmt)
+
 	switch b {
 	case 0:
 		// Chunk stream IDs 64-319 can be encoded in the 2-byte version of this

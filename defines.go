@@ -7,13 +7,14 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/zhangpeihao/goamf"
-	"github.com/zhangpeihao/log"
 	"io"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/zhangpeihao/goamf"
+	"github.com/zhangpeihao/log"
 )
 
 var DefaultObjectEncoding uint = amf.AMF0
@@ -267,10 +268,11 @@ var (
 	//FLASH_PLAYER_VERSION_STRING = "LNX 10,0,32,18"
 	FLASH_PLAYER_VERSION_STRING = "LNX 9,0,124,2"
 	//FLASH_PLAYER_VERSION_STRING = "WIN 11,5,502,146"
-	SWF_URL_STRING     = "http://localhost/1.swf"
-	PAGE_URL_STRING    = "http://localhost/1.html"
-	MIN_BUFFER_LENGTH  = uint32(256)
-	FMS_VERSION        = []byte{0x04, 0x05, 0x00, 0x01}
+	SWF_URL_STRING    = "http://localhost/1.swf"
+	PAGE_URL_STRING   = "http://localhost/1.html"
+	MIN_BUFFER_LENGTH = uint32(256)
+	//FMS_VERSION       = []byte{0x04, 0x05, 0x00, 0x01}
+	FMS_VERSION        = []byte{0x05, 0xc5, 0xd0, 0x84, 0x03, 0x00, 0x01, 0x01}
 	FMS_VERSION_STRING = "4,5,0,297"
 )
 
@@ -564,6 +566,9 @@ func WriteToNetwork(w Writer, data []byte) (written int, err error) {
 			written += int(n)
 			continue
 		}
+
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG, "Error", err)
+
 		netErr, ok := err.(net.Error)
 		if !ok {
 			return

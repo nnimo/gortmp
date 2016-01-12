@@ -7,11 +7,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/zhangpeihao/goamf"
-	"github.com/zhangpeihao/log"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/zhangpeihao/goamf"
+	"github.com/zhangpeihao/log"
 )
 
 const (
@@ -79,8 +80,12 @@ func NewInboundConn(c net.Conn, br *bufio.Reader, bw *bufio.Writer,
 
 // Callback when recieved message. Audio & Video data
 func (ibConn *inboundConn) OnReceived(conn Conn, message *Message) {
+	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "search stream with id", message.StreamID)
+
 	stream, found := ibConn.streams[message.StreamID]
 	if found {
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "stream found")
+
 		if !stream.Received(message) {
 			ibConn.handler.OnReceived(ibConn.conn, message)
 		}
@@ -215,7 +220,7 @@ func (ibConn *inboundConn) onConnect(cmd *Command) {
 	if ibConn.authHandler.OnConnectAuth(ibConn, cmd) {
 		ibConn.conn.SetWindowAcknowledgementSize()
 		ibConn.conn.SetPeerBandwidth(2500000, SET_PEER_BANDWIDTH_DYNAMIC)
-		ibConn.conn.SetChunkSize(4096)
+		//ibConn.conn.SetChunkSize(4096)
 		ibConn.sendConnectSucceededResult(cmd)
 	} else {
 		ibConn.sendConnectErrorResult(cmd)
