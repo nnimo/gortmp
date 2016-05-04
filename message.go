@@ -4,6 +4,7 @@ package gortmp
 
 import (
 	"bytes"
+
 	"github.com/zhangpeihao/log"
 )
 
@@ -22,6 +23,8 @@ type Message struct {
 	Buf               *bytes.Buffer
 	IsInbound         bool
 	AbsoluteTimestamp uint32
+	NeedSync          bool
+	SyncChan          chan int
 }
 
 func NewMessage(csi uint32, t uint8, sid uint32, ts uint32, data []byte) *Message {
@@ -32,11 +35,27 @@ func NewMessage(csi uint32, t uint8, sid uint32, ts uint32, data []byte) *Messag
 		Timestamp:         ts,
 		AbsoluteTimestamp: ts,
 		Buf:               new(bytes.Buffer),
+		NeedSync:          false,
 	}
 	if data != nil {
 		message.Buf.Write(data)
 		message.Size = uint32(len(data))
 	}
+	return message
+}
+
+func NewBufMessage(csi uint32, t uint8, sid uint32, ts uint32, buf *bytes.Buffer) *Message {
+	message := &Message{
+		ChunkStreamID:     csi,
+		Type:              t,
+		StreamID:          sid,
+		Timestamp:         ts,
+		AbsoluteTimestamp: ts,
+		Buf:               buf,
+		NeedSync:          true,
+		SyncChan:          make(chan int),
+	}
+
 	return message
 }
 

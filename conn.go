@@ -109,9 +109,10 @@ type conn struct {
 	handler ConnHandler
 
 	// Network connection
-	c  net.Conn
-	br *bufio.Reader
-	bw *bufio.Writer
+	c          net.Conn
+	br         *bufio.Reader
+	bw         *bufio.Writer
+	messageBuf bytes.Buffer
 
 	// Last transaction ID
 	lastTransactionID uint32
@@ -130,7 +131,7 @@ func NewConn(c net.Conn, br *bufio.Reader, bw *bufio.Writer, handler ConnHandler
 		inChunkStreams:              make(map[uint32]*InboundChunkStream),
 		highPriorityMessageQueue:    make(chan *Message, DEFAULT_HIGH_PRIORITY_BUFFER_SIZE),
 		middlePriorityMessageQueue:  make(chan *Message, DEFAULT_MIDDLE_PRIORITY_BUFFER_SIZE),
-		lowPriorityMessageQueue:     make(chan *Message, DEFAULT_LOW_PRIORITY_BUFFER_SIZE),
+		lowPriorityMessageQueue:     make(chan *Message),
 		inChunkSize:                 DEFAULT_CHUNK_SIZE,
 		outChunkSize:                DEFAULT_CHUNK_SIZE,
 		inWindowSize:                DEFAULT_WINDOW_SIZE,
@@ -221,6 +222,10 @@ func (conn *conn) sendMessage(message *Message) {
 		// Set chunk size
 		conn.outChunkSize = conn.outChunkSizeTemp
 		conn.outChunkSizeTemp = 0
+	}
+
+	if message.NeedSync {
+		message.SyncChan <- 1
 	}
 }
 
@@ -348,13 +353,15 @@ func (conn *conn) readLoop() {
 		}
 		if message == nil {
 			// New message
+			conn.messageBuf.Reset()
+
 			message = &Message{
 				ChunkStreamID:     csi,
 				Type:              header.MessageTypeID,
 				Timestamp:         header.RealTimestamp(),
 				Size:              header.MessageLength,
 				StreamID:          header.MessageStreamID,
-				Buf:               new(bytes.Buffer),
+				Buf:               &conn.messageBuf,
 				IsInbound:         true,
 				AbsoluteTimestamp: absoluteTimestamp,
 			}

@@ -35,13 +35,16 @@ const (
 
 // Result codes
 const (
-	RESULT_CONNECT_OK            = "NetConnection.Connect.Success"
-	RESULT_CONNECT_REJECTED      = "NetConnection.Connect.Rejected"
-	RESULT_CONNECT_OK_DESC       = "Connection successed."
-	RESULT_CONNECT_REJECTED_DESC = "[ AccessManager.Reject ] : [ code=400 ] : "
-	NETSTREAM_PLAY_START         = "NetStream.Play.Start"
-	NETSTREAM_PLAY_RESET         = "NetStream.Play.Reset"
-	NETSTREAM_PUBLISH_START      = "NetStream.Publish.Start"
+	RESULT_CONNECT_OK              = "NetConnection.Connect.Success"
+	RESULT_CONNECT_REJECTED        = "NetConnection.Connect.Rejected"
+	RESULT_CONNECT_OK_DESC         = "Connection successed."
+	RESULT_CONNECT_REJECTED_DESC   = "[ AccessManager.Reject ] : [ code=400 ] : "
+	NETSTREAM_PLAY_START           = "NetStream.Play.Start"
+	NETSTREAM_PLAY_UNPUBLISH       = "NetStream.Play.UnpublishNotify"
+	NETSTREAM_PLAY_STREAM_NOTFOUND = "NetStream.Play.StreamNotFound"
+	NETSTREAM_PLAY_RESET           = "NetStream.Play.Reset"
+	NETSTREAM_PAUSE_NOTIFY         = "NetStream.Pause.Notify"
+	NETSTREAM_PUBLISH_START        = "NetStream.Publish.Start"
 )
 
 // Chunk stream ID

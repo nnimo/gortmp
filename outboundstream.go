@@ -3,6 +3,7 @@
 package gortmp
 
 import (
+	"bytes"
 	"errors"
 
 	"github.com/zhangpeihao/goamf"
@@ -11,6 +12,9 @@ import (
 
 type OutboundStreamHandler interface {
 	OnPlayStart(stream OutboundStream)
+	OnPlayUnpublish(stream OutboundStream)
+	OnPlayStreamNotFound(stream OutboundStream)
+	OnPauseNotify(stream OutboundStream)
 	OnPublishStart(stream OutboundStream)
 }
 
@@ -24,6 +28,7 @@ type outboundStream struct {
 	chunkStreamID uint32
 	handler       OutboundStreamHandler
 	bufferLength  uint32
+	messageBuf    bytes.Buffer
 }
 
 // A RTMP logical stream on connection.
@@ -34,9 +39,13 @@ type OutboundStream interface {
 	// ID
 	ID() uint32
 	// Pause
-	Pause() error
+	Pause(duration uint32) error
 	// Resume
 	Resume() error
+	//Receive audio
+	ReceiveAudio(f *bool) error
+	//Receive audio
+	ReceiveVideo(f *bool) error
 	// Close
 	Close()
 	// Received messages
@@ -66,7 +75,7 @@ type OutboundPublishStream interface {
 // A play stream
 type OutboundPlayStream interface {
 	// Play
-	Play(streamName string, start, duration *uint32, reset *bool) (err error)
+	Play(streamName string, start, duration *float32, reset *bool) (err error)
 	// Seeks the kerframe closedst to the specified location.
 	Seek(offset uint32)
 }
@@ -81,13 +90,94 @@ func (stream *outboundStream) ID() uint32 {
 }
 
 // Pause
-func (stream *outboundStream) Pause() error {
-	return errors.New("Unimplemented")
+func (stream *outboundStream) Pause(duration uint32) (err error) {
+	conn := stream.conn.Conn()
+	
+	cmd := &Command{
+		IsFlex:        false,
+		Name:          "pause",
+		TransactionID: 0,
+		Objects:       make([]interface{}, 3),
+	}
+	
+	cmd.Objects[0] = nil
+	cmd.Objects[1] = true
+	cmd.Objects[2] = duration
+
+	// Construct message
+	message := NewMessage(stream.chunkStreamID, COMMAND_AMF0, stream.id, 0, nil)
+	if err = cmd.Write(message.Buf); err != nil {
+		return
+	}
+	message.Dump("pause")
+
+	err = conn.Send(message)
+	if err != nil {
+		return
+	}
+
+	return nil
 }
 
 // Resume
 func (stream *outboundStream) Resume() error {
 	return errors.New("Unimplemented")
+}
+
+// ReceiveAudio
+func (stream *outboundStream) ReceiveAudio(f *bool) (err error) {
+	conn := stream.conn.Conn()
+	
+	cmd := &Command{
+		IsFlex:        false,
+		Name:          "receiveAudio",
+		TransactionID: 0,
+		Objects:       make([]interface{}, 2),
+	}
+	cmd.Objects[0] = nil
+	cmd.Objects[1] = f
+
+	// Construct message
+	message := NewMessage(stream.chunkStreamID, COMMAND_AMF0, stream.id, 0, nil)
+	if err = cmd.Write(message.Buf); err != nil {
+		return
+	}
+	message.Dump("receiveAudio")
+
+	err = conn.Send(message)
+	if err != nil {
+		return
+	}
+
+	return nil
+}
+
+// ReceiveVideo
+func (stream *outboundStream) ReceiveVideo(f *bool) (err error) {
+	conn := stream.conn.Conn()
+	
+	cmd := &Command{
+		IsFlex:        false,
+		Name:          "receiveVideo",
+		TransactionID: 0,
+		Objects:       make([]interface{}, 2),
+	}
+	cmd.Objects[0] = nil
+	cmd.Objects[1] = f
+
+	// Construct message
+	message := NewMessage(stream.chunkStreamID, COMMAND_AMF0, stream.id, 0, nil)
+	if err = cmd.Write(message.Buf); err != nil {
+		return
+	}
+	message.Dump("receiveVideo")
+
+	err = conn.Send(message)
+	if err != nil {
+		return
+	}
+
+	return nil
 }
 
 // Close
@@ -149,7 +239,7 @@ func (stream *outboundStream) Publish(streamName, howToPublish string) (err erro
 	return conn.Send(message)
 }
 
-func (stream *outboundStream) Play(streamName string, start, duration *uint32, reset *bool) (err error) {
+func (stream *outboundStream) Play(streamName string, start, duration *float32, reset *bool) (err error) {
 	conn := stream.conn.Conn()
 	// Keng-die: in stream transaction ID always been 0
 	// Create play command
@@ -312,6 +402,27 @@ func (stream *outboundStream) onStatus(cmd *Command) bool {
 		if stream.handler != nil {
 			stream.handler.OnPlayStart(stream)
 		}
+	case NETSTREAM_PLAY_UNPUBLISH:
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "Play unpublish")
+		// Set buffer size
+		//stream.conn.Conn().SetStreamBufferSize(stream.id, 1500)
+		if stream.handler != nil {
+			stream.handler.OnPlayUnpublish(stream)
+		}
+	case NETSTREAM_PLAY_STREAM_NOTFOUND:
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "Play stream not found")
+		// Set buffer size
+		//stream.conn.Conn().SetStreamBufferSize(stream.id, 1500)
+		if stream.handler != nil {
+			stream.handler.OnPlayStreamNotFound(stream)
+		}
+	case NETSTREAM_PAUSE_NOTIFY:
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "Play stream pause")
+		// Set buffer size
+		//stream.conn.Conn().SetStreamBufferSize(stream.id, 1500)
+		if stream.handler != nil {
+			stream.handler.OnPauseNotify(stream)
+		}
 	case NETSTREAM_PUBLISH_START:
 		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "Publish started")
 		if stream.handler != nil {
@@ -342,9 +453,21 @@ func (stream *outboundStream) PublishAudioData(data []byte, deltaTimestamp uint3
 
 // Publish video data
 func (stream *outboundStream) PublishVideoData(data []byte, deltaTimestamp uint32) (err error) {
-	message := NewMessage(stream.chunkStreamID, VIDEO_TYPE, stream.id, AUTO_TIMESTAMP, data)
+	stream.messageBuf.Reset()
+	stream.messageBuf.Write(data)
+
+	// reuse byte.Buffer
+	message := NewBufMessage(stream.chunkStreamID, VIDEO_TYPE, stream.id, AUTO_TIMESTAMP, &stream.messageBuf)
 	message.Timestamp = deltaTimestamp
-	return stream.conn.Send(message)
+	message.Size = uint32(len(data))
+
+	// Video data has low priority
+	// Low priority chan: make(chan *Message)
+	// Chan without buffer prevent Message corruption
+	err = stream.conn.Send(message)
+	<-message.SyncChan
+
+	return err
 }
 
 // Publish data
